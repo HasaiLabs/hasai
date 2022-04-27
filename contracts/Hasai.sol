@@ -86,10 +86,20 @@ contract Hasai is
         return _borrowId.current();
     }
 
+    event LogUpdateMinBorrowTime(uint time);
     function updateMinBorrowTime(uint _time) external onlyManager {
         MIN_BORROW_TIME = _time;
+        emit LogUpdateMinBorrowTime(_time);
     }
 
+    event LogUpdateCollectionMpa(
+        address nft,
+        uint apr,
+        uint period,
+        uint borrowRate,
+        string slug,
+        string name
+    );
     function updateCollectionMap(
         address _nft,
         uint _apr,
@@ -110,15 +120,21 @@ contract Hasai is
             borrowRate: _borrowRate
         });
         supportNFT.add(_nft);
+
+        emit LogUpdateCollectionMpa(_nft, _apr, _period, _borrowRate, _slug, _name);
     }
 
+    event LogUpdateOracle(address oracle);
     function updatePriceOracle(address _oracle) external onlyManager {
         priceOracle = _oracle;
+        emit LogUpdateOracle(_oracle);
     }
 
+    event LogRemoveCollectionMap(address nft);
     function removeCollectionMap(address _nft) external onlyOwner {
         delete collectionMap[_nft];
         supportNFT.remove(_nft);
+        emit LogRemoveCollectionMap(_nft);
     }
 
     function pause() external onlyOwner {
@@ -149,8 +165,8 @@ contract Hasai is
         });
     }
 
-    event Deposit(address indexed user, address indexed nft, uint id);
-    event BalanceNotify(uint balance, uint borrowAmount);
+    event LogDeposit(address indexed user, address indexed nft, uint id);
+    event LogBalanceNotify(uint balance, uint borrowAmount);
 
     function queryNFTPriceCB(bytes32 _requestId, uint256 _price)
         public
@@ -182,9 +198,9 @@ contract Hasai is
                 userBorrowIdMap[info.user].add(borrowId);
                 _safeTransferETHWithFallback(info.user, borrowAmount);
 
-                emit Deposit(info.user, info.nft, info.id);
+                emit LogDeposit(info.user, info.nft, info.id);
             } else {
-                emit BalanceNotify(address(this).balance, borrowAmount);
+                emit LogBalanceNotify(address(this).balance, borrowAmount);
             }
         }
 
@@ -212,7 +228,7 @@ contract Hasai is
         return repayAmount;
     }
 
-    event Repay(address indexed user, uint indexed id);
+    event LogRepay(address indexed user, uint indexed id, uint amount);
 
     function repay(uint borrowId) external payable {
         BorrowItem storage info = borrowMap[borrowId];
@@ -234,16 +250,18 @@ contract Hasai is
         if (msg.value - repayAmount > 0) {
             _safeTransferETHWithFallback(_msgSender(), msg.value - repayAmount);
         }
-        emit Repay(_msgSender(), borrowId);
+        emit LogRepay(_msgSender(), borrowId, repayAmount);
     }
 
+    event LogWithdrawETH(address indexed receipt, uint amount);
     function withdrawETH(address receipt, uint _amount) external onlyOwner nonReentrant {
         uint amount = address(this).balance;
         require(amount >= _amount, "bad amount");
         _safeTransferETH(receipt, _amount);
+        emit LogWithdrawETH(receipt, _amount);
     }
 
-    event BidStart(uint indexed id, uint amount);
+    event LogBidStart(address indexed user, uint indexed id, uint amount);
     function liquidation(uint borrowId)
         external
         payable
@@ -271,10 +289,10 @@ contract Hasai is
 
         auctions.add(borrowId);
 
-        emit BidStart(borrowId, repayAmount);
+        emit LogBidStart(_msgSender(), borrowId, repayAmount);
     }
 
-    event CreateBid(uint indexed id, address user, uint amount);
+    event LogCreateBid(uint indexed id, address user, uint amount);
     function createBid(uint borrowId) external payable nonReentrant {
         Auction storage _auction = auctionMap[borrowId];
 
@@ -293,9 +311,10 @@ contract Hasai is
         _auction.endTime += 1 hours;
         _auction.bidder  = payable(msg.sender);
 
-        emit CreateBid(borrowId, msg.sender, msg.value);
+        emit LogCreateBid(borrowId, msg.sender, msg.value);
     }
 
+    event LogClaimBidNFT(address indexed user, uint id);
     function claimBidNFT(uint borrowId) external nonReentrant {
         Auction storage _auction = auctionMap[borrowId];
 
@@ -309,14 +328,20 @@ contract Hasai is
         BorrowItem memory info = borrowMap[borrowId];
 
         IERC721Upgradeable(info.nft).safeTransferFrom(address(this), _msgSender(), info.id);
+
+        emit LogClaimBidNFT(_msgSender(), borrowId);
     }
 
+    event LogWithdrawERC20(address receipt, address token, uint amount);
     function withdrawERC20(address receipt, address _token) external onlyOwner {
         uint amount = IERC20Upgradeable(_token).balanceOf(address(this));
         SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(_token), receipt, amount);
+
+        emit LogWithdrawERC20(receipt, _token, amount);
     }
 
     // for one NFT always no liquidation case, owner can withdraw nft to do other things
+    event LogWithdrawNFT(uint indexed borrowId, address receipt, address nft, uint id);
     function withdrawNFT(uint borrowId, address receipt, address _nft, uint _id) external onlyOwner {
         BorrowItem storage info = borrowMap[borrowId];
 
@@ -327,6 +352,8 @@ contract Hasai is
         userBorrowIdMap[info.user].remove(borrowId);
 
         IERC721Upgradeable(_nft).safeTransferFrom(address(this), receipt, _id);
+
+        emit LogWithdrawNFT(borrowId, receipt, _nft, _id);
     }
 
     function _safeTransferETHWithFallback(address to, uint256 amount) internal {

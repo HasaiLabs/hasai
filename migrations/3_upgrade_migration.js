@@ -1,7 +1,7 @@
 const Hasai = artifacts.require("Hasai");
 const { prepareUpgrade, upgradeProxy } = require('@openzeppelin/truffle-upgrades');
 
-const proxy = '';
+const proxy = '[Proxy Address]';
 
 module.exports = async function (deployer) {
     try {

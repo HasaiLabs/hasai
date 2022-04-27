@@ -5,8 +5,8 @@ const { deployProxy } = require('@openzeppelin/truffle-upgrades');
 module.exports = async function (deployer) {
     try {
         await deployProxy(Hasai, [
-            ethers.constants.AddressZero,
-            ''
+            '[WETH Address]',
+            '[Oracle Address]'
         ],
         {
             deployer,
