@@ -45,10 +45,17 @@ contract Hasai is
         _;
     }
 
+    modifier onlyPriceOracle() {
+        require(_msgSender() == priceOracle, "bad caller");
+        _;
+    }
+
     function initialize(
         address _weth,
         address _oracle
-    ) public initializer {
+    ) external initializer {
+        require(_weth != address(0) && priceOracle != address(0), "bad parameters");
+
         WETH = _weth;
         priceOracle = _oracle;
         MIN_BORROW_TIME = 5 minutes;
@@ -126,6 +133,7 @@ contract Hasai is
 
     event LogUpdateOracle(address oracle);
     function updatePriceOracle(address _oracle) external onlyManager {
+        require(_oracle != address(0), "bad address");
         priceOracle = _oracle;
         emit LogUpdateOracle(_oracle);
     }
@@ -165,11 +173,12 @@ contract Hasai is
         });
     }
 
-    event LogDeposit(address indexed user, address indexed nft, uint id);
+    event LogDeposit(address indexed user, address indexed nft, uint id, uint amount);
     event LogBalanceNotify(uint balance, uint borrowAmount);
 
     function queryNFTPriceCB(bytes32 _requestId, uint256 _price)
         public
+        onlyPriceOracle
     {
         if (requestMap[_requestId].user != address(0) && _price > 0) {
             Request memory info = requestMap[_requestId];
@@ -198,7 +207,7 @@ contract Hasai is
                 userBorrowIdMap[info.user].add(borrowId);
                 _safeTransferETHWithFallback(info.user, borrowAmount);
 
-                emit LogDeposit(info.user, info.nft, info.id);
+                emit LogDeposit(info.user, info.nft, info.id, borrowAmount);
             } else {
                 emit LogBalanceNotify(address(this).balance, borrowAmount);
             }
@@ -230,7 +239,7 @@ contract Hasai is
 
     event LogRepay(address indexed user, uint indexed id, uint amount);
 
-    function repay(uint borrowId) external payable {
+    function repay(uint borrowId) external payable nonReentrant {
         BorrowItem storage info = borrowMap[borrowId];
 
         require(block.timestamp - info.startTime > MIN_BORROW_TIME, "too fast");
@@ -277,13 +286,15 @@ contract Hasai is
 
         uint repayAmount = this.calcRent(borrowId, info.liquidateTime);
 
+        require(msg.value >= repayAmount, "bad amount");
+
         // operator is the first bidder
         auctionMap[borrowId] = Auction({
             endTime: block.timestamp + 24 hours,
             bidder: payable(_msgSender()),
             startTime: block.timestamp,
             borrowId: borrowId,
-            amount: repayAmount,
+            amount: msg.value,
             settled: false
         });
 
@@ -359,7 +370,7 @@ contract Hasai is
     function _safeTransferETHWithFallback(address to, uint256 amount) internal {
         if (!_safeTransferETH(to, amount)) {
             IWETH(WETH).deposit{value: amount}();
-            IERC20Upgradeable(WETH).transfer(to, amount);
+            require(IERC20Upgradeable(WETH).transfer(to, amount), "failed");
         }
     }
 

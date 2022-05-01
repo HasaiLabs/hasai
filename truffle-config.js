@@ -29,7 +29,7 @@ const HDWalletProvider = require("@truffle/hdwallet-provider");
 const infuraKey = fs.readFileSync(".infuraKey").toString().trim();
 const mnemonic = fs.readFileSync(".mnemonic").toString().trim();
 const etherscanApiKey = fs.readFileSync(".etherscanApi").toString().trim();
-const key = ''
+
 module.exports = {
   /**
    * Networks define how you connect to your ethereum client and let you set the
@@ -57,7 +57,7 @@ module.exports = {
       provider: () =>
         new HDWalletProvider(
           mnemonic,
-          `https://rinkeby.infura.io/v3/${key}`
+          `https://rinkeby.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161`
         ),
       network_id: 4,
       networkCheckTimeout: 1000000,
@@ -69,7 +69,7 @@ module.exports = {
       provider: () =>
         new HDWalletProvider(
           mnemonic,
-          `https://kovan.infura.io/v3/${key}`
+          `https://kovan.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161`
         ),
       network_id: 42,
       networkCheckTimeout: 1000000,
