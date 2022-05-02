@@ -20,7 +20,7 @@ interface IWETH {
 
 interface IPriceOracle {
     function requestNFTPrice(
-        string memory _nftName,
+        address _nft,
         address _callbackAddr,
         bytes4 _callbackFn
     ) external returns(bytes32);

@@ -54,7 +54,7 @@ contract Hasai is
         address _weth,
         address _oracle
     ) external initializer {
-        require(_weth != address(0) && priceOracle != address(0), "bad parameters");
+        require(_weth != address(0) && _oracle != address(0), "bad parameters");
 
         WETH = _weth;
         priceOracle = _oracle;
@@ -159,9 +159,10 @@ contract Hasai is
         whenNotPaused
     {
         require(supportNFT.contains(_nft), "not support yet");
+        require(IERC721Upgradeable(_nft).ownerOf(_id) == _msgSender(), "not the owner");
 
         bytes32 requestId = IPriceOracle(priceOracle).requestNFTPrice(
-            collectionMap[_nft].slug,
+            _nft,
             address(this),
             this.queryNFTPriceCB.selector
         );
