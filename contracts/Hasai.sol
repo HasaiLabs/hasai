@@ -174,11 +174,11 @@ contract Hasai is
         });
     }
 
-    event LogDeposit(address indexed user, address indexed nft, uint id, uint amount);
+    event LogDeposit(uint indexed borrowId, address indexed user, address indexed nft, uint id, uint amount);
     event LogBalanceNotify(uint balance, uint borrowAmount);
 
     function queryNFTPriceCB(bytes32 _requestId, uint256 _price)
-        public
+        external
         onlyPriceOracle
     {
         if (requestMap[_requestId].user != address(0) && _price > 0) {
@@ -208,7 +208,7 @@ contract Hasai is
                 userBorrowIdMap[info.user].add(borrowId);
                 _safeTransferETHWithFallback(info.user, borrowAmount);
 
-                emit LogDeposit(info.user, info.nft, info.id, borrowAmount);
+                emit LogDeposit(borrowId, info.user, info.nft, info.id, borrowAmount);
             } else {
                 emit LogBalanceNotify(address(this).balance, borrowAmount);
             }
@@ -238,7 +238,7 @@ contract Hasai is
         return repayAmount;
     }
 
-    event LogRepay(address indexed user, uint indexed id, uint amount);
+    event LogRepay(uint indexed borrowId, address indexed user, address indexed nft, uint id, uint amount);
 
     function repay(uint borrowId) external payable nonReentrant {
         BorrowItem storage info = borrowMap[borrowId];
@@ -260,18 +260,18 @@ contract Hasai is
         if (msg.value - repayAmount > 0) {
             _safeTransferETHWithFallback(_msgSender(), msg.value - repayAmount);
         }
-        emit LogRepay(_msgSender(), borrowId, repayAmount);
+        emit LogRepay(borrowId, _msgSender(), info.nft, info.id, repayAmount);
     }
 
     event LogWithdrawETH(address indexed receipt, uint amount);
-    function withdrawETH(address receipt, uint _amount) external onlyOwner nonReentrant {
+    function withdrawETH(address receipt, uint _amount) external onlyOwner {
         uint amount = address(this).balance;
         require(amount >= _amount, "bad amount");
         _safeTransferETH(receipt, _amount);
         emit LogWithdrawETH(receipt, _amount);
     }
 
-    event LogBidStart(address indexed user, uint indexed id, uint amount);
+    event LogBidStart(uint indexed borrowId, address indexed user, address indexed nft, uint id, uint amount);
     function liquidation(uint borrowId)
         external
         payable
@@ -282,7 +282,7 @@ contract Hasai is
         require(info.user != address(0) && info.status == Status.BORROW, "bad req");
         require(this.checkDepositIsExpired(borrowId), "not expired");
 
-        info.status = Status.LIQUIDATE;
+        info.status = Status.AUCTION;
         userBorrowIdMap[info.user].remove(borrowId);
 
         uint repayAmount = this.calcRent(borrowId, info.liquidateTime);
@@ -301,13 +301,14 @@ contract Hasai is
 
         auctions.add(borrowId);
 
-        emit LogBidStart(_msgSender(), borrowId, repayAmount);
+        emit LogBidStart(borrowId, _msgSender(), info.nft, info.id, repayAmount);
     }
 
-    event LogCreateBid(uint indexed id, address user, uint amount);
+    event LogCreateBid(uint indexed borrowId, address indexed user, uint amount);
     function createBid(uint borrowId) external payable nonReentrant {
         Auction storage _auction = auctionMap[borrowId];
 
+        require(borrowMap[borrowId].status == Status.AUCTION, "bad status");
         require(!_auction.settled, "already settled");
         require(_auction.borrowId == borrowId, 'bad req');
         require(msg.value > _auction.amount, "bid price too low");
@@ -326,22 +327,23 @@ contract Hasai is
         emit LogCreateBid(borrowId, msg.sender, msg.value);
     }
 
-    event LogClaimBidNFT(address indexed user, uint id);
+    event LogClaimBidNFT(uint indexed borrowId, address indexed user);
     function claimBidNFT(uint borrowId) external nonReentrant {
         Auction storage _auction = auctionMap[borrowId];
+        BorrowItem storage info = borrowMap[borrowId];
 
+        require(info.status == Status.AUCTION, "bad status");
         require(!_auction.settled, 'already claimed');
         require(_auction.bidder == _msgSender(), 'bad req');
         require(block.timestamp > _auction.endTime, 'Auction not expired');
 
         _auction.settled = true;
         auctions.remove(borrowId);
-
-        BorrowItem memory info = borrowMap[borrowId];
+        info.status = Status.WITHDRAW;
 
         IERC721Upgradeable(info.nft).safeTransferFrom(address(this), _msgSender(), info.id);
 
-        emit LogClaimBidNFT(_msgSender(), borrowId);
+        emit LogClaimBidNFT(borrowId, _msgSender());
     }
 
     event LogWithdrawERC20(address receipt, address token, uint amount);
@@ -360,7 +362,7 @@ contract Hasai is
         require(block.timestamp > info.liquidateTime, "not expired");
         require(info.user != address(0) && info.status == Status.BORROW, "bad req");
 
-        info.status = Status.LIQUIDATE;
+        info.status = Status.WITHDRAW;
         userBorrowIdMap[info.user].remove(borrowId);
 
         IERC721Upgradeable(_nft).safeTransferFrom(address(this), receipt, _id);

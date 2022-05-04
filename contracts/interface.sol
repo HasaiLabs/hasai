@@ -30,7 +30,7 @@ interface IPunk {
     function transferPunk(address to, uint punkIndex) external;
 }
 
-enum Status { BORROW, REPAY, LIQUIDATE }
+enum Status { BORROW, REPAY, AUCTION, WITHDRAW }
 
 struct BorrowItem {
     address nft;
