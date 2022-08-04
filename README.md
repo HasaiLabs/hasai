@@ -12,7 +12,11 @@
 
 # what is Hasai
 
-The first decentralized fixed-rate NFT lending protocol.
+Hasai aims to become the first decentralized, dual-rate NFT lending protocol that applies to all NFT collections and provides a one-stop comprehensive solution for NFT market liquidity issues. 
+
+Hasai provides Peer-to-Pool model lending services to all NFT collections, while also promoting the financialization of NFTs by allowing NFT creators to create their own lending pools, with a robust token governance and economic model.
+
+Hasai is unique in that its solution provides lending pools for all levels of NFT collections and is not limited to blue-chip NFT projects.
 
 #### work flow
 
